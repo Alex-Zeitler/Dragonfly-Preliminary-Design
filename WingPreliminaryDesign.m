@@ -1,0 +1,235 @@
+%% RC Aircraft Wing Design Parameter Calculator
+% This script calculates wing design parameters for preliminary design
+% Git-friendly version with improved error handling and documentation
+%
+% Author: [Your Name]
+% Date: [Date]
+% Version: 2.0
+
+%% Initialization
+clear; clc; close all;
+
+% Add current directory to path (helpful for Git workflows)
+addpath(genpath(pwd));
+
+fprintf('Starting RC Aircraft Wing Design Calculator...\n');
+fprintf('MATLAB Version: %s\n', version);
+fprintf('Current Directory: %s\n\n', pwd);
+
+%% Given Parameters
+W = 20;         % Weight [lbs]
+b = 10;         % Wing span [ft]
+CL = 0.75;      % Lift coefficient [-]
+e = 0.8;        % Oswald efficiency factor (assumed)
+
+% Sea level conditions
+rho_slug = 0.002377;  % Air density [slug/ft^3]
+rho_lbm = 0.0765;     % Air density [lbm/ft^3]
+
+%% Input Validation
+if W <= 0 || b <= 0 || CL <= 0 || e <= 0 || e > 1
+    error('Invalid input parameters. All values must be positive, and e must be ≤ 1');
+end
+
+%% Unit Conversions
+W_N = W * 4.448;      % Weight in Newtons
+b_m = b * 0.3048;     % Wing span in meters
+rho_SI = 1.225;       % Air density at sea level [kg/m^3]
+
+%% Calculate Wing Area
+% From lift equation: L = W = 0.5 * rho * V^2 * S * CL
+% But we need to assume a flight speed or calculate stall speed
+
+% Let's calculate for different scenarios:
+fprintf('=== RC AIRCRAFT WING DESIGN PARAMETERS ===\n\n');
+
+% First, let's assume typical RC cruise speeds and see what we get
+V_mph = [10, 20, 30, 40];  % Typical RC aircraft speeds [mph]
+V_fps = V_mph * 1.467;     % Convert to ft/s
+
+fprintf('Given Parameters:\n');
+fprintf('Weight: %.1f lbs\n', W);
+fprintf('Wing span: %.1f ft\n', b);
+fprintf('Lift coefficient: %.2f\n', CL);
+fprintf('Oswald efficiency: %.2f\n', e);
+fprintf('Air density: %.6f slug/ft^3\n\n', rho_slug);
+
+fprintf('WING AREA CALCULATIONS FOR DIFFERENT SPEEDS:\n');
+fprintf('Speed [mph]  Speed [ft/s]  Wing Area [ft^2]  Mean Chord [ft]  Aspect Ratio\n');
+fprintf('--------------------------------------------------------------------------\n');
+
+% Initialize arrays for storing results
+S_array = zeros(size(V_fps));
+c_mean_array = zeros(size(V_fps));
+AR_array = zeros(size(V_fps));
+
+for i = 1:length(V_fps)
+    % Calculate required wing area: S = W / (0.5 * rho * V^2 * CL)
+    S_array(i) = W / (0.5 * rho_slug * V_fps(i)^2 * CL);
+    
+    % Calculate mean aerodynamic chord
+    c_mean_array(i) = S_array(i) / b;
+    
+    % Calculate aspect ratio
+    AR_array(i) = b^2 / S_array(i);
+    
+    fprintf('%8.0f     %8.1f      %8.2f         %8.3f        %8.2f\n', ...
+            V_mph(i), V_fps(i), S_array(i), c_mean_array(i), AR_array(i));
+end
+
+%% Design Analysis for Selected Cruise Speed
+V_cruise_mph = 40;  % Can be easily modified by collaborators
+V_cruise_fps = V_cruise_mph * 1.467;
+
+S = W / (0.5 * rho_slug * V_cruise_fps^2 * CL);
+c_mean = S / b;
+AR = b^2 / S;
+
+fprintf('\n=== DETAILED ANALYSIS FOR %.0f MPH CRUISE ===\n', V_cruise_mph);
+fprintf('Wing area: %.2f ft^2\n', S);
+fprintf('Mean chord: %.3f ft (%.2f in)\n', c_mean, c_mean*12);
+fprintf('Aspect ratio: %.2f\n', AR);
+
+%% Additional Performance Calculations
+
+% Induced drag coefficient
+CDi = CL^2 / (pi * e * AR);
+
+% Wing loading
+WS = W / S;  % lbs/ft^2
+
+% Power loading estimation (very rough)
+% Assume total drag coefficient CD = CD0 + CDi, with CD0 ≈ 0.03 for clean RC aircraft
+CD0 = 0.03;  % Parasitic drag coefficient estimate
+CD_total = CD0 + CDi;
+
+% Drag force
+D = 0.5 * rho_slug * V_cruise_fps^2 * S * CD_total;  % lbs
+
+% Power required (thrust power, not shaft power)
+P_thrust_hp = (D * V_cruise_fps) / 550;  % Convert ft-lbs/s to hp
+
+% L/D ratio
+LD_ratio = CL / CD_total;
+
+fprintf('\nPERFORMANCE ESTIMATES:\n');
+fprintf('Induced drag coefficient: %.5f\n', CDi);
+fprintf('Total drag coefficient: %.5f (assuming CD0 = %.3f)\n', CD_total, CD0);
+fprintf('Wing loading: %.2f lbs/ft^2\n', WS);
+fprintf('Drag force: %.2f lbs\n', D);
+fprintf('Thrust power required: %.2f hp\n', P_thrust_hp);
+fprintf('L/D ratio: %.1f\n', LD_ratio);
+
+%% Stall Speed Calculation
+% At stall, CL = CL_max. Assume CL_max ≈ 1.2-1.4 for typical airfoils
+CL_max = 1.3;  % Typical value for NACA 4-digit series
+
+V_stall_fps = sqrt(2 * W / (rho_slug * S * CL_max));
+V_stall_mph = V_stall_fps / 1.467;
+
+fprintf('\nSTALL CHARACTERISTICS:\n');
+fprintf('Assumed CL_max: %.1f\n', CL_max);
+fprintf('Stall speed: %.1f mph (%.1f ft/s)\n', V_stall_mph, V_stall_fps);
+
+%% Geometric Considerations for Rectangular Wing
+fprintf('\n=== RECTANGULAR WING DESIGN OPTION ===\n');
+fprintf('For a simple rectangular wing:\n');
+fprintf('Chord length: %.3f ft (%.1f in)\n', c_mean, c_mean*12);
+fprintf('Wing area: %.2f ft^2\n', S);
+fprintf('Aspect ratio: %.2f\n', AR);
+
+%% Tapered Wing Option
+% Assume root chord = 1.5 * tip chord for moderate taper
+taper_ratio = 0.67;  % tip chord / root chord
+c_root = (2 * c_mean) / (1 + taper_ratio);
+c_tip = taper_ratio * c_root;
+
+fprintf('\n=== TAPERED WING DESIGN OPTION ===\n');
+fprintf('Taper ratio (Ct/Cr): %.2f\n', taper_ratio);
+fprintf('Root chord: %.3f ft (%.1f in)\n', c_root, c_root*12);
+fprintf('Tip chord: %.3f ft (%.1f in)\n', c_tip, c_tip*12);
+fprintf('Mean aerodynamic chord: %.3f ft (%.1f in)\n', c_mean, c_mean*12);
+
+%% Design Recommendations
+fprintf('\n=== DESIGN RECOMMENDATIONS ===\n');
+if AR > 8
+    fprintf('• High aspect ratio (%.1f) - good efficiency, may need dihedral for stability\n', AR);
+elseif AR < 6
+    fprintf('• Low aspect ratio (%.1f) - consider increasing wing area for better efficiency\n', AR);
+else
+    fprintf('• Good aspect ratio (%.1f) for RC aircraft\n', AR);
+end
+
+if WS > 2.0
+    fprintf('• Wing loading is high (%.1f lbs/ft^2) - aircraft will be fast\n', WS);
+elseif WS < 1.0
+    fprintf('• Wing loading is low (%.1f lbs/ft^2) - good for slow flight and training\n', WS);
+else
+    fprintf('• Wing loading (%.1f lbs/ft^2) is typical for sport RC aircraft\n', WS);
+end
+
+fprintf('• Recommended motor power: %.1f - %.1f hp\n', P_thrust_hp*1.5, P_thrust_hp*2.0);
+fprintf('• Consider washout of 2-3° for better stall characteristics\n');
+
+%% Results Summary
+fprintf('\n=== SUMMARY TABLE ===\n');
+fprintf('Parameter                Value         Units\n');
+fprintf('----------------------------------------\n');
+fprintf('Weight                   %-8.1f     lbs\n', W);
+fprintf('Wing span                %-8.1f     ft\n', b);
+fprintf('Wing area                %-8.2f     ft^2\n', S);
+fprintf('Mean chord               %-8.3f     ft\n', c_mean);
+fprintf('Aspect ratio             %-8.2f     -\n', AR);
+fprintf('Wing loading             %-8.2f     lbs/ft^2\n', WS);
+fprintf('Cruise speed             %-8.0f     mph\n', V_cruise_mph);
+fprintf('Stall speed              %-8.1f     mph\n', V_stall_mph);
+fprintf('L/D ratio                %-8.1f     -\n', LD_ratio);
+fprintf('Est. power required      %-8.2f     hp\n', P_thrust_hp);
+
+%% Save Results (Optional - for team collaboration)
+% Uncomment the following lines if you want to save results to a file
+% results = struct('W', W, 'b', b, 'S', S, 'c_mean', c_mean, 'AR', AR, ...
+%                 'WS', WS, 'V_cruise_mph', V_cruise_mph, 'V_stall_mph', V_stall_mph, ...
+%                 'LD_ratio', LD_ratio, 'P_thrust_hp', P_thrust_hp);
+% 
+% % Save to MAT file with timestamp
+% save(['wing_design_results_' datestr(now, 'yyyymmdd_HHMMSS') '.mat'], 'results');
+% fprintf('\nResults saved to: wing_design_results_%s.mat\n', datestr(now, 'yyyymmdd_HHMMSS'));
+
+fprintf('\n=== CALCULATION COMPLETE ===\n');
+fprintf('Script executed successfully at %s\n', datestr(now));
+
+%% Optional: Create plots for visualization
+% Uncomment if you want to generate plots for your team
+% figure('Name', 'Wing Design Analysis', 'NumberTitle', 'off');
+% 
+% subplot(2,2,1);
+% plot(V_mph, S_array, 'b-o', 'LineWidth', 2);
+% xlabel('Speed [mph]');
+% ylabel('Wing Area [ft^2]');
+% title('Required Wing Area vs Speed');
+% grid on;
+% 
+% subplot(2,2,2);
+% plot(V_mph, AR_array, 'r-s', 'LineWidth', 2);
+% xlabel('Speed [mph]');
+% ylabel('Aspect Ratio');
+% title('Aspect Ratio vs Speed');
+% grid on;
+% 
+% subplot(2,2,3);
+% plot(V_mph, c_mean_array*12, 'g-^', 'LineWidth', 2);
+% xlabel('Speed [mph]');
+% ylabel('Mean Chord [in]');
+% title('Mean Chord vs Speed');
+% grid on;
+% 
+% subplot(2,2,4);
+% WS_array = W ./ S_array;
+% plot(V_mph, WS_array, 'm-d', 'LineWidth', 2);
+% xlabel('Speed [mph]');
+% ylabel('Wing Loading [lbs/ft^2]');
+% title('Wing Loading vs Speed');
+% grid on;
+% 
+% sgtitle(sprintf('Wing Design Analysis for %.0f lb Aircraft', W));
