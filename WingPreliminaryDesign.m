@@ -233,7 +233,3 @@ fprintf('Script executed successfully at %s\n', datestr(now));
 % grid on;
 % 
 % sgtitle(sprintf('Wing Design Analysis for %.0f lb Aircraft', W));
-
-%% test test test
-% please for the love of god work
-% fat 
